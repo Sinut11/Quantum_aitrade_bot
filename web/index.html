@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Quantum AI Earn</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{
+      --bg:#ffffff; --subtle:#f4f6f8; --text:#0b1220; --muted:#64748b;
+      --brand:#2563eb; --brand-2:#1d4ed8; --good:#10b981; --warn:#f59e0b; --bad:#ef4444;
+      --border:#e5e7eb; --chip:#eef2ff; --pill:#e9f7ff; --accent:#e0f2fe;
+      --shadow:0 8px 24px rgba(2,6,23,.06); --glow:0 0 0 4px rgba(37,99,235,.12), 0 10px 20px rgba(37,99,235,.18);
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:760px;margin:0 auto;padding:14px}
+    .hdr{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}
+    .logo{display:flex;gap:10px;align-items:center}
+    .logo-b{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,#60a5fa,#3b82f6)}
+    .logo-t{font-weight:800;font-size:20px;letter-spacing:.2px}
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
+    .tab{background:var(--chip);color:#1e293b;border:1px solid var(--border);padding:9px 14px;border-radius:16px;cursor:pointer;user-select:none}
+    .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .col{flex:1;min-width:240px}
+    .h{font-weight:800;margin-bottom:8px;font-size:14px;letter-spacing:.2px}
+    .h-lg{font-weight:800;margin:0 0 10px;font-size:16px}
+    input[type="text"], input[type="number"]{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;font:inherit;background:#fff}
+    .btn{display:inline-flex;align-items:center;justify-content:center;background:var(--brand);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn-alt{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+    .btn-ghost{background:#fff;color:#111;border:1px solid var(--border)}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .muted{color:#64748b;font-size:12px}
+    .kv{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px dashed var(--border);border-radius:10px;background:var(--subtle)}
+    .banner{background:linear-gradient(180deg,#f0f9ff,#e6f4ff);border:1px solid var(--accent);border-radius:14px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+    .banner .title{font-weight:800;letter-spacing:.2px}
+    .big{font-size:26px;font-weight:900}
+    .usd{font-size:12px;margin-left:6px;opacity:.75}
+    .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .plan{flex:1;min-width:160px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .plan .rate{font-weight:900}
+    .plan .minor{font-size:12px;color:var(--muted)}
+    .divider{height:1px;background:var(--border);margin:12px 0}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+    .table th{font-size:12px;color:var(--muted);font-weight:700}
+    .right{display:flex;gap:8px;align-items:center}
+    .badge{background:#eef2ff;color:#1e293b;border:1px solid var(--border);padding:4px 8px;border-radius:10px;font-weight:700;font-size:12px}
+    .stat{display:flex;flex-direction:column;gap:6px}
+    .stat .v{font-weight:900;font-size:20px}
+    .glow{box-shadow:var(--glow)}
+    .highlight{background:linear-gradient(180deg,#eef2ff,#e6edff);border-color:#dbe3ff}
+    .chip-mini{display:inline-flex;align-items:center;gap:6px;background:#f1f5ff;border:1px solid #d7e0ff;padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px}
+    .p-pos{color:#10b981;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- header -->
+    <div class="hdr">
+      <div class="logo">
+        <div class="logo-b"></div>
+        <div class="logo-t">Quantum AI Earn</div>
+      </div>
+    </div>
+
+    <!-- Total earned banner -->
+    <div class="banner" id="earnedBanner">
+      <div class="title">Total Earned</div>
+      <div><span class="big" id="totalEarned">0.00</span><span class="usd">USDT</span></div>
+    </div>
+
+    <!-- tabs -->
+    <div class="tabs">
+      <div class="tab active" data-tab="dashboard" id="tabBtnDashboard">Dashboard</div>
+      <div class="tab" data-tab="invest" id="tabBtnInvest">Invest</div>
+      <div class="tab" data-tab="referrals">Referrals</div>
+      <div class="tab" data-tab="withdraw">Withdraw</div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard">
+      <div id="referredByWrap" class="card" style="display:none">
+        <div class="h">Referral</div>
+        <div class="chip-mini" id="referredByChip">Referred by —</div>
+      </div>
+
+      <div class="row">
+        <div class="card col">
+          <div class="h">QP Balance</div>
+          <div class="stat">
+            <div class="v"><span id="qpBalance">0.00</span> <span class="usd">QP</span></div>
+            <div class="muted">Spend QP to buy plans.</div>
+          </div>
+        </div>
+        <div class="card col">
+          <div class="h">Locked QP</div>
+          <div class="stat">
+            <div class="v"><span id="lockedQP">0.00</span> <span class="usd">QP</span></div>
+            <div class="muted">QP is burned after 20 days.</div>
+          </div>
+        </div>
+        <div class="card col">
+          <div class="h">Referral earned</div>
+          <div class="stat">
+            <div class="v"><span id="refEarned">0.00</span> <span class="usd">USDT</span></div>
+            <div class="muted">1% per level up to 15 levels.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card highlight">
+        <div class="h">Transfer to QP (+3% bonus)</div>
+        <div class="row">
+          <div class="col">
+            <div class="kv">
+              <span>Convert all earned (USDT) to QP</span>
+              <span class="badge" id="earnedNowDash">$0.00</span>
+            </div>
+            <div class="muted" id="earnedNowDashPreview">—</div>
+          </div>
+          <div class="right">
+            <button class="btn btn-alt" id="toQpBtnDash">Transfer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h">Invite link</div>
+        <div class="row">
+          <div class="col"><input id="inviteLink" type="text" readonly /></div>
+          <div><button class="btn btn-ghost" id="copyInvite">Copy</button></div>
+        </div>
+      </div>
+
+      <!-- Active QP on Dashboard -->
+      <div class="card">
+        <div class="h">Active QP</div>
+        <div class="muted" id="activeQP">—</div>
+      </div>
+
+      <!-- Trading history -->
+      <div class="card">
+        <div class="h">Trading history</div>
+        <table class="table" id="liveTrades">
+          <thead>
+            <tr>
+              <th>Time (UTC)</th>
+              <th>Pair</th>
+              <th>Amount (USDT)</th>
+              <th>Profit (USDT)</th>
+              <th>Leverage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" class="muted">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- INVEST -->
+    <section id="tab-invest" style="display:none">
+      <div class="card">
+        <div class="h">Deposit (USDT → QP)</div>
+        <div class="row">
+          <div class="col"><input id="depAmount" type="number" min="10" placeholder="Enter amount (min $10)" /></div>
+          <div><button class="btn" id="getAddrBtn">Get deposit address</button></div>
+        </div>
+        <div class="divider"></div>
+        <div id="addrBlock" style="display:none">
+          <div class="row">
+            <div class="col"><input id="depositAddress" class="mono" type="text" readonly /></div>
+            <div><button class="btn btn-ghost" id="copyAddr">Copy</button></div>
+          </div>
+          <div class="muted" id="addrStatus">mode: — • Credited after ~5 blocks.</div>
+        </div>
+        <div class="muted" id="depHint" style="display:none"></div>
+      </div>
+
+      <div class="card">
+        <div class="h-lg">20-day plan (daily tiers)</div>
+        <div class="pill-row">
+          <div class="plan"><div class="rate">6.1% / day</div><div class="minor">for ≤ 100 QP</div></div>
+          <div class="plan"><div class="rate">6.2% / day</div><div class="minor">for 100–250 QP</div></div>
+          <div class="plan"><div class="rate">6.3% / day</div><div class="minor">for 250–1,000 QP</div></div>
+          <div class="plan"><div class="rate">6.5% / day</div><div class="minor">for 1,000–5,000 QP</div></div>
+          <div class="plan"><div class="rate">6.8% / day</div><div class="minor">for &gt; 5,000 QP</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h">20-day return (based on Spend QP)</div>
+        <div class="row">
+          <div class="col kv"><span>Daily return</span><span class="h"><span id="calcDaily">0.00</span> <span class="usd">USDT</span></span></div>
+          <div class="col kv"><span>Total back (20d)</span><span class="h"><span id="calcTotal">0.00</span> <span class="usd">USDT</span></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h">Buy with QP</div>
+        <div class="row">
+          <div class="col"><input id="buyQp" type="number" min="20" placeholder="Spend QP (min 20)" /></div>
+          <div><button class="btn" id="buyBtn">Confirm</button></div>
+        </div>
+        <div class="muted" id="buyHint">Your QP will be engaged for 20 days; it is burned at the end.</div>
+      </div>
+      <!-- Active QP section intentionally REMOVED from Invest -->
+    </section>
+
+    <!-- REFERRALS -->
+    <section id="tab-referrals" style="display:none">
+      <div class="card">
+        <div class="h">Your invite link</div>
+        <div class="row">
+          <div class="col"><input id="inviteLink2" type="text" readonly /></div>
+          <div><button class="btn btn-ghost" id="copyInvite2">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h-lg">Summary (up to 15 levels)</div>
+        <table class="table" id="refTable">
+          <thead>
+            <tr><th style="width:25%">Level</th><th style="width:25%">Referrals</th><th>Earnings (USDT)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- WITHDRAW -->
+    <section id="tab-withdraw" style="display:none">
+      <div class="card highlight glow">
+        <div class="h-lg">Transfer to QP (+3% bonus)</div>
+        <div class="row">
+          <div class="col">
+            <div class="kv">
+              <span>Convert all earned (USDT) to QP</span>
+              <span class="badge" id="earnedNow">$0.00</span>
+            </div>
+            <div class="muted" id="earnedNowPreview">—</div>
+          </div>
+          <div class="right">
+            <button class="btn btn-alt" id="toQpBtn">Transfer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h-lg">Withdraw earnings</div>
+        <div class="row">
+          <div class="col">
+            <label class="muted">Your BEP-20 USDT address</label>
+            <input id="payoutAddr" type="text" placeholder="0x…" />
+          </div>
+          <div class="right">
+            <button class="btn" id="saveAddrBtn">Save</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="col">
+            <label class="muted">Amount (min $5)</label>
+            <input id="wdAmount" type="number" min="5" placeholder="Enter USDT amount (min $5)" />
+          </div>
+          <div class="right">
+            <button class="btn" id="withdrawBtn">Withdraw</button>
+          </div>
+        </div>
+        <div class="muted" id="wdHint">Minimum withdrawal is $5.</div>
+      </div>
+    </section>
+
+    <div class="muted" style="text-align:center;margin:18px 0">@Quantum_aitrade_bot</div>
+  </div>
+
+<script>
+/* helpers */
+const $ = (s) => document.querySelector(s);
+const setText = (sel, v) => { const el=$(sel); if (el) el.textContent=v; };
+const fmt2 = (n)=> (Number(n||0)).toFixed(2);
+const copyFrom = (inp)=>{ inp.select(); inp.setSelectionRange(0,99999); document.execCommand('copy'); };
+
+function resolveTgId(){
+  const p = new URLSearchParams(location.search);
+  const q = p.get('tgId');
+  const t = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user)
+      ? String(Telegram.WebApp.initDataUnsafe.user.id) : null;
+  return t || q || '';
+}
+const TG_ID = resolveTgId();
+const withTg = (path)=> TG_ID ? `${path}${path.includes('?')?'&':'?'}tgId=${encodeURIComponent(TG_ID)}` : path;
+
+async function GET(path){ const r = await fetch(withTg(path), {credentials:'include'}); return r.json(); }
+async function POST(path, body){
+  const r = await fetch(withTg(path), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+  return r.json();
+}
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const sel = t.dataset.tab;
+    document.querySelectorAll('section[id^="tab-"]').forEach(s=>s.style.display='none');
+    document.querySelector(`#tab-${sel}`).style.display='';
+  });
+});
+
+/* copy buttons */
+$('#copyInvite').onclick  = ()=> copyFrom($('#inviteLink'));
+$('#copyInvite2').onclick = ()=> copyFrom($('#inviteLink2'));
+$('#copyAddr').onclick    = ()=> copyFrom($('#depositAddress'));
+
+/* Invest calculators (UI approx) */
+function baseTierRate(qp){
+  qp = Number(qp||0);
+  if (qp <= 100) return 0.011;
+  if (qp <= 250) return 0.012;
+  if (qp <= 1000) return 0.013;
+  if (qp <= 5000) return 0.015;
+  return 0.018;
+}
+function tierRatePlus5(qp){ return baseTierRate(qp) + 0.05; }
+function updateCalc(){
+  const qp = Number($('#buyQp').value||0);
+  const rate = tierRatePlus5(qp);
+  const daily = qp * rate;
+  const total = qp * (1 + rate*20);
+  setText('#calcDaily', fmt2(daily));
+  setText('#calcTotal', fmt2(total));
+}
+$('#buyQp').addEventListener('input', updateCalc);
+
+/* Buy action */
+$('#buyBtn').onclick = async ()=>{
+  const qp = Number($('#buyQp').value||0);
+  if (!qp || qp<20) { $('#buyHint').innerHTML = '<span style="color:#ef4444;font-weight:700">Minimum is 20 QP.</span>'; return; }
+  $('#buyBtn').disabled = true;
+  try{
+    const res = await POST('/api/invest/buy', { qp });
+    if (!res.ok) throw new Error(res.error||'buy_failed');
+    $('#buyHint').innerHTML = '<span style="color:#10b981;font-weight:700">Plan activated!</span>';
+    await refreshMe();
+    document.getElementById('tabBtnDashboard').click();
+  }catch(e){
+    const msg = (e && e.message === 'min_qp_20') ? 'Minimum is 20 QP.' : 'Buy failed.';
+    $('#buyHint').innerHTML = `<span style="color:#ef4444;font-weight:700">${msg}</span>`;
+    console.error('buy failed', e);
+  }finally{ $('#buyBtn').disabled=false; }
+};
+
+/* Deposit address */
+$('#getAddrBtn').onclick = async ()=>{
+  const amt = Number($('#depAmount').value||0);
+  if (!amt || amt<10) { $('#depHint').style.display=''; $('#depHint').innerHTML = '<span style="color:#ef4444;font-weight:700">Min $10.</span>'; return; }
+  $('#depHint').style.display='none';
+  $('#getAddrBtn').disabled = true;
+  try{
+    const r = await GET('/api/deposit-address');
+    if (!r.ok || !r.address) throw new Error('no_address');
+    $('#addrBlock').style.display='';
+    $('#depositAddress').value = r.address;
+    $('#addrStatus').textContent = `mode: ${r.mode||'—'} • Credited after ~5 blocks.`;
+  }catch(e){
+    $('#depHint').style.display='';
+    $('#depHint').innerHTML = '<span style="color:#ef4444;font-weight:700">Could not fetch address.</span>';
+    console.error('deposit-address error', e);
+  }finally{ $('#getAddrBtn').disabled=false; }
+};
+
+/* Withdraw + transfer-to-qp */
+$('#saveAddrBtn').onclick = async ()=>{
+  const addr = ($('#payoutAddr').value||'').trim();
+  if (!addr || !addr.startsWith('0x') || addr.length<20){ $('#wdHint').innerHTML='<span style="color:#ef4444;font-weight:700">Enter a valid BEP-20 address.</span>'; return; }
+  $('#saveAddrBtn').disabled=true;
+  try{
+    const r = await POST('/api/profile/wallet', { address: addr });
+    if (!r.ok) throw 0;
+    $('#wdHint').innerHTML='<span style="color:#10b981;font-weight:700">Address saved.</span>';
+  }catch(e){
+    $('#wdHint').innerHTML='<span style="color:#ef4444;font-weight:700">Save failed.</span>';
+  }finally{ $('#saveAddrBtn').disabled=false; }
+};
+
+$('#withdrawBtn').onclick = async ()=>{
+  const amt = Number($('#wdAmount').value||0);
+  const addr = ($('#payoutAddr').value||'').trim();
+  if (!addr || !addr.startsWith('0x')) { $('#wdHint').innerHTML='<span style="color:#ef4444;font-weight:700">Add your BEP-20 address first.</span>'; return; }
+  if (!amt || amt<5) { $('#wdHint').innerHTML='<span style="color:#ef4444;font-weight:700">Minimum is $5.</span>'; return; }
+  $('#withdrawBtn').disabled=true;
+  try{
+    const r = await POST('/api/withdraw', { amount: amt, address: addr });
+    if (!r.ok) throw 0;
+    $('#wdHint').innerHTML='<span style="color:#10b981;font-weight:700">Withdrawal submitted.</span>';
+    await refreshMe();
+  }catch(e){
+    $('#wdHint').innerHTML='<span style="color:#ef4444;font-weight:700">Withdraw failed.</span>';
+  }finally{ $('#withdrawBtn').disabled=false; }
+};
+
+async function doTransferToQP(){
+  try{
+    const r = await POST('/api/earnings/transfer-to-qp', {});
+    if (!r.ok) {
+      const msg = (r && r.error === 'nothing_to_transfer') ? 'Nothing to transfer.' : 'Transfer failed.';
+      alert(msg);
+      return;
+    }
+    alert(`Transferred $${fmt2(r.transferred)} + bonus $${fmt2(r.bonus)} → ${fmt2(r.creditedQP)} QP`);
+    await refreshMe();
+  }catch(e){
+    alert('Transfer failed.');
+  }
+}
+$('#toQpBtn').onclick = doTransferToQP;
+$('#toQpBtnDash').onclick = doTransferToQP;
+
+/* Referrals summary */
+async function loadRefs(){
+  try{
+    const r = await GET('/api/referrals?summary=true');
+    const tb = document.querySelector('#refTable tbody'); 
+    tb.innerHTML = '';
+
+    const arr = (r && r.ok && Array.isArray(r.summary)) ? r.summary
+              : (r && Array.isArray(r.levels)) ? r.levels
+              : [];
+
+    for (let i = 1; i <= 15; i++){
+      const row = arr.find(x => Number(x.level) === i) || arr[i-1] || {};
+      const refs = Number((row && row.count != null) ? row.count : 0);
+      const earn = Number((row && row.earnings != null) ? row.earnings : 0);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>Level ${i}</td><td>${refs}</td><td>$${fmt2(earn)}</td>`;
+      tb.appendChild(tr);
+    }
+  }catch(e){
+    console.error('refs load', e);
+  }
+}
+
+/* /api/me → Dashboard data incl. Active QP list (no unlock date) */
+function setInviteLink(botUsername, referralCode){
+  const link = `https://t.me/${botUsername}?start=${referralCode}`;
+  document.getElementById('inviteLink').value = link;
+  document.getElementById('inviteLink2').value = link;
+}
+
+async function refreshMe(){
+  try{
+    const me = await GET('/api/me');
+    if (!me.ok) throw 0;
+
+    const refBy = me.referredByUsername || me.referredBy || me.invitedBy || me.referredByCode;
+    if (refBy){
+      document.getElementById('referredByWrap').style.display='';
+      document.getElementById('referredByChip').textContent = `Referred by ${refBy}`;
+    }
+
+    const b = me.balances || {};
+    const totalEarn = Number(me.totalEarned || (b.packageEarned||0) + (b.referralEarned||0));
+    setText('#totalEarned', fmt2(totalEarn));
+    setText('#earnedNow', `$${fmt2(totalEarn)}`);
+    setText('#earnedNowDash', `$${fmt2(totalEarn)}`);
+
+    // +3% preview
+    const BONUS_RATE = 0.03;
+    const preview = totalEarn > 0 ? `→ will credit ${fmt2(totalEarn * (1 + BONUS_RATE))} QP` : '—';
+    const el1 = document.getElementById('earnedNowPreview');
+    if (el1) el1.textContent = preview;
+    const el2 = document.getElementById('earnedNowDashPreview');
+    if (el2) el2.textContent = preview;
+
+    setText('#qpBalance', fmt2(Number(b.qp || 0)));
+    setText('#lockedQP', fmt2(Number(b.lockedQP || 0)));
+    setText('#refEarned', fmt2(Number(b.referralEarned || 0)));
+
+    // --- Active QP section (no unlock date) ---
+    const plans = Array.isArray(me.activePlans) ? me.activePlans : [];
+    plans.sort((a,b)=>{
+      const da = new Date(a.unlockAt || a.endAt).getTime();
+      const db = new Date(b.unlockAt || b.endAt).getTime();
+      return da - db;
+    });
+    const lines = plans.map(p=>{
+      const credited = Number(p.creditedDays || 0);
+      const left = (typeof p.remainingDays === 'number')
+        ? p.remainingDays
+        : Math.max(0, 20 - credited);
+      return `• ${fmt2(p.qp)} QP locked • ${left}d left of 20d`;
+    });
+    document.getElementById('activeQP').innerHTML = lines.length ? lines.join('<br/>') : '—';
+
+    if (me.botUsername && me.referralCode) setInviteLink(me.botUsername, me.referralCode);
+    if (me.payoutAddress) document.getElementById('payoutAddr').value = me.payoutAddress;
+  }catch(e){
+    console.error('me error', e);
+  }
+}
+
+/* Live trades */
+function renderTrades(trades){
+  const tb = document.querySelector('#liveTrades tbody'); tb.innerHTML = '';
+  if (!Array.isArray(trades) || !trades.length){
+    tb.innerHTML = '<tr><td colspan="5" class="muted">—</td></tr>'; return;
+  }
+  trades.forEach(t=>{
+    const tr = document.createElement('tr');
+    const timeUTC = new Date(t.time).toISOString().substring(11,16) + ' UTC';
+    const p = Number(t.profit||0);
+    tr.innerHTML = `
+      <td>${timeUTC}</td>
+      <td>${t.symbol}</td>
+      <td>${fmt2(t.amount)}</td>
+      <td class="p-pos">+${fmt2(p)}</td>
+      <td>${t.leverage||''}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+async function loadTrades(){
+  try{
+    const r = await GET('/api/trades');
+    if (r && r.ok) renderTrades(r.trades);
+  }catch(e){ console.error('trades load', e); }
+}
+
+/* init */
+(async function init(){
+  try{ if (Telegram?.WebApp?.ready) Telegram.WebApp.ready(); }catch{}
+  updateCalc();
+  await refreshMe();
+  await loadRefs();
+  await loadTrades();
+
+  // periodic refresh
+  let n=0;
+  const t=setInterval(async()=>{ n++; try{ await refreshMe(); }catch{} if (n>60) clearInterval(t); }, 10000);
+  setInterval(loadTrades, 60000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+const express = require("express");
+const dayjs = require("dayjs");
+const User = require("./models/User");
+const Investment = require("./models/Investment");
+const Txn = require("./models/Txn");
+const router = express.Router();
+
+// helper
+const PLAN_RATE = { 15: 0.01, 30: 0.012, 45: 0.015, 60: 0.018 };
+
+async function getOrCreateUser({ tgId, firstName, username, ref }) {
+  let user = await User.findOne({ tgId });
+  if (!user) {
+    user = await User.create({ tgId, firstName, username });
+    // attach upline if ref present (tgId of upline)
+    if (ref) {
+      const upline = await User.findOne({ tgId: ref });
+      if (upline) {
+        user.upline = upline._id;
+        await user.save();
+
+        // register 15-level ancestry
+        let cur = upline;
+        for (let lvl = 1; lvl <= 15 && cur; lvl++) {
+          cur.referrals.push({ level: lvl, userId: user._id });
+          await cur.save();
+          cur = await User.findById(cur.upline);
+        }
+      }
+    }
+  }
+  return user;
+}
+
+// --- Public: miniapp pulls user summary ---
+router.get("/user/:tgId", async (req, res) => {
+  const user = await getOrCreateUser({
+    tgId: req.params.tgId,
+    firstName: req.query.firstName,
+    username: req.query.username,
+    ref: req.query.ref
+  });
+  const active = await Investment.find({ user: user._id, status: "active" });
+  res.json({
+    ok: true,
+    user: {
+      tgId: user.tgId,
+      balance: user.balance,
+      locked: user.locked,
+      qp: user.qp,
+      totalDeposited: user.totalDeposited,
+      totalWithdrawn: user.totalWithdrawn,
+      totalReferralEarned: user.totalReferralEarned,
+    },
+    active
+  });
+});
+
+// --- DEV Deposit credit (simulate blockchain) ---
+router.post("/deposit/credit", async (req, res) => {
+  const { tgId, amount } = req.body;
+  if (!tgId || !amount || amount <= 0) return res.status(400).json({ ok:false, error:"bad_args" });
+
+  const user = await getOrCreateUser({ tgId });
+  user.balance += amount;
+  user.totalDeposited += amount;
+  await user.save();
+
+  await Txn.create({ user: user._id, type: "deposit", amount, meta: { dev: true } });
+
+  // Referral payouts: 15 levels × 1% of deposit
+  let cur = await User.findById(user.upline);
+  for (let lvl = 1; lvl <= 15 && cur; lvl++) {
+    const bonus = amount * 0.01;
+    cur.balance += bonus;
+    cur.totalReferralEarned += bonus;
+    await Txn.create({ user: cur._id, type: "referral", amount: bonus, meta: { from: user.tgId, level: lvl } });
+    await cur.save();
+    cur = await User.findById(cur.upline);
+  }
+
+  res.json({ ok: true, balance: user.balance });
+});
+
+// --- Invest (move balance → locked, create plan, add QP) ---
+router.post("/invest", async (req, res) => {
+  const { tgId, amount, days } = req.body;
+  const rate = PLAN_RATE[days];
+  if (!tgId || !amount || amount < 1 || !rate) return res.status(400).json({ ok:false, error:"bad_args" });
+
+  const user = await getOrCreateUser({ tgId });
+  if (user.balance < amount) return res.status(400).json({ ok:false, error:"insufficient_balance" });
+
+  user.balance -= amount;
+  user.locked += amount;
+  user.qp += amount; // initial QP equals capital
+  await user.save();
+
+  const inv = await Investment.create({
+    user: user._id,
+    planDays: days,
+    dailyRate: rate,
+    capital: amount,
+    creditedDays: 0,
+    startAt: new Date(),
+    nextCreditAt: dayjs().add(1, "second").toDate(), // first tick next cron (fast in dev)
+    endsAt: dayjs().add(days, "day").toDate()
+  });
+
+  await Txn.create({ user: user._id, type: "invest", amount, meta: { planDays: days, rate } });
+
+  res.json({ ok: true, invId: inv._id, qp: user.qp, locked: user.locked, balance: user.balance });
+});
+
+// --- Withdraw (min $2), dev instant approve toggle ---
+router.post("/withdraw", async (req, res) => {
+  const { tgId, amount } = req.body;
+  if (!tgId || !amount || amount < 2) return res.status(400).json({ ok:false, error:"min_2" });
+
+  const user = await getOrCreateUser({ tgId });
+  if (user.balance < amount) return res.status(400).json({ ok:false, error:"insufficient_balance" });
+
+  user.balance -= amount;
+  user.totalWithdrawn += amount;
+  await user.save();
+
+  await Txn.create({ user: user._id, type: "withdraw", amount, meta: { devInstant: true } });
+
+  res.json({ ok: true, balance: user.balance });
+});
+
+module.exports = router;
