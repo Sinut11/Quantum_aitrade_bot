@@ -5,9 +5,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Deposit = require('../models/Deposit');
 
-// ---- Admin auth ----
-// Allow in ANY environment (dev/prod) if X-Admin-Key matches ADMIN_KEY.
-// You can also flip ALLOW_DEBUG=true to bypass the key entirely (optional).
+// ---- Admin auth (works in any env) ----
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const ALLOW_DEBUG = String(process.env.ALLOW_DEBUG || '').toLowerCase() === 'true';
 
@@ -17,16 +15,19 @@ function isAuthed(req) {
   return ADMIN_KEY && key === ADMIN_KEY;
 }
 
-function isPositiveNumber(n) {
-  return typeof n === 'number' && isFinite(n) && n > 0;
-}
+// Quick sanity check so you know which code is live
+router.get('/ping', (req, res) => {
+  res.json({
+    ok: true,
+    env: process.env.NODE_ENV || 'unknown',
+    allowDebug: ALLOW_DEBUG,
+    hasAdminKey: !!ADMIN_KEY,
+    note: 'If you see this, the new debug.js is deployed.'
+  });
+});
 
-/**
- * POST /api/debug/simulate-deposit
- * body: { tgId: "3001", amount: 50, txid?: "devtx-3001-001" }
- * - Creates a confirmed "Deposit" (idempotent by txid).
- * - Credits balances.qp += amount.
- */
+// POST /api/debug/simulate-deposit
+// body: { tgId: "3001", amount: 60, txid?: "dev-3001-seed" }
 router.post('/simulate-deposit', async (req, res) => {
   try {
     if (!isAuthed(req)) {
@@ -37,13 +38,13 @@ router.post('/simulate-deposit', async (req, res) => {
     if (!tgId) return res.status(400).json({ ok: false, error: 'tgId_required' });
 
     const amt = Number(amount);
-    if (!isPositiveNumber(amt)) {
+    if (!(typeof amt === 'number' && isFinite(amt) && amt > 0)) {
       return res.status(400).json({ ok: false, error: 'amount_invalid' });
     }
 
     const safeTxid = txid || `devtx-${tgId}-${Date.now()}`;
 
-    // Idempotency: reuse existing deposit if txid seen before
+    // Idempotent by txid
     let dep = await Deposit.findOne({ txid: safeTxid });
     if (!dep) {
       dep = await Deposit.create({
@@ -56,15 +57,14 @@ router.post('/simulate-deposit', async (req, res) => {
       });
     }
 
-    // Credit the user's QP
-    const user = await User.findOne({ tgId });
+    const user = await (await User).findOne({ tgId });
     if (!user) return res.status(404).json({ ok: false, error: 'user_not_found' });
-    if (!user.balances) user.balances = {};
 
+    user.balances = user.balances || {};
     user.balances.qp = Number(user.balances.qp || 0) + dep.creditedQP;
     await user.save();
 
-    return res.json({
+    res.json({
       ok: true,
       credited: dep.creditedQP,
       qpBalance: user.balances.qp,
@@ -72,7 +72,7 @@ router.post('/simulate-deposit', async (req, res) => {
       status: dep.status
     });
   } catch (e) {
-    // If duplicate txid (unique index), treat as success
+    // Duplicate txid? Treat as success.
     if (e && e.code === 11000 && req.body?.txid) {
       const dep = await Deposit.findOne({ txid: req.body.txid });
       return res.json({
@@ -83,7 +83,7 @@ router.post('/simulate-deposit', async (req, res) => {
       });
     }
     console.error('simulate-deposit error', e);
-    return res.status(500).json({ ok: false, error: 'server_error' });
+    res.status(500).json({ ok: false, error: 'server_error' });
   }
 });
 

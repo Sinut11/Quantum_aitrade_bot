@@ -13,23 +13,26 @@ const userCtx = require('./middleware/userCtx');
 // Models
 const User = require('./models/User');
 try { require('./models/DepositAllocation'); } catch {}
-const Deposit = require('./models/Deposit'); // ensure models/Deposit.js exists
+const Deposit = require('./models/Deposit');
 
-// Inline Withdrawal model (so no missing route/module)
+// Inline Withdrawal model
 const Withdrawal = mongoose.models.Withdrawal || mongoose.model(
   'Withdrawal',
   new mongoose.Schema({
     tgId: { type: String, index: true },
     amount: Number,
     address: String,
-    status: { type: String, default: 'pending' }, // pending -> paid / rejected
+    status: { type: String, default: 'pending' },
     meta: Object,
   }, { timestamps: true })
 );
 
+// --- env ---
 const PORT = Number(process.env.PORT || 8080);
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || '';
 const BOT_USERNAME = (process.env.BOT_USERNAME || 'Quantum_aitrade_bot').replace(/^@/, '');
+const ADMIN_KEY = process.env.ADMIN_KEY || ''; // <-- set this in Render
+const NODE_ENV = process.env.NODE_ENV || 'production';
 
 let DB_READY = false;
 mongoose.set('bufferCommands', false);
@@ -95,6 +98,10 @@ function extractRefCode(req) {
   if (req.query.ref)      return String(req.query.ref);
   return null;
 }
+function isAdmin(req) {
+  const hdr = req.get('X-Admin-Key') || '';
+  return ADMIN_KEY && hdr && hdr === ADMIN_KEY;
+}
 
 function dailyRateFromQp(qp){
   qp = Number(qp||0);
@@ -116,15 +123,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(userCtx);
 
-// (These external routes are optional; if missing, our inline endpoints below cover them)
+// Optional external routes
 try { app.use("/api", require("./routes/referralBind")); } catch {}
 try { app.use("/api/_internal", require("./routes/depositsWebhook")); } catch {}
-// try { app.use('/api/withdraw', require('./routes/withdraw')); } catch {} // not needed now
 try { app.use('/api', require('./routes/deposit')); } catch {}
 
 // Health
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.get('/api/ping', (_req, res) => res.json({ ok: true, now: Date.now() }));
+app.get('/api/ping', (_req, res) => res.json({ ok: true, now: Date.now(), env: NODE_ENV }));
 
 /**
  * Lazy/idempotent daily earnings for active 20d plans.
@@ -258,8 +264,7 @@ app.post('/api/invest/buy', async (req, res) => {
 
 /**
  * POST /api/earnings/transfer-to-qp
- * - Convert ALL (packageEarned + referralEarned) → QP
- * - Apply +3% bonus
+ * - Convert ALL (packageEarned + referralEarned) → QP with +3% bonus
  */
 app.post('/api/earnings/transfer-to-qp', async (req, res) => {
   try{
@@ -332,8 +337,8 @@ app.post('/api/profile/wallet', async (req, res) => {
 /**
  * POST /api/withdraw
  * - Min $5
- * - Requires payout address (request body takes precedence; else stored address)
- * - Deducts from earnings ONLY (packageEarned first, then referralEarned)
+ * - Requires payout address
+ * - Deducts from earnings ONLY (packageEarned then referralEarned)
  * - Creates a pending Withdrawal record
  */
 app.post('/api/withdraw', async (req, res) => {
@@ -390,7 +395,6 @@ app.post('/api/withdraw', async (req, res) => {
 
 /**
  * GET /api/history
- * Simple combined history (deposits + withdrawals) for demos
  */
 app.get('/api/history', async (req, res) => {
   try{
@@ -412,10 +416,10 @@ app.get('/api/history', async (req, res) => {
 
 /**
  * GET /api/me
- * - Find/create user
- * - Bind referral (once)
+ * - find/create user
+ * - bind referral (once)
  * - creditDueRoi
- * - Recompute lockedQP from activePlans (authoritative, auto-heal)
+ * - lockedQP = sum(activePlans.qp)
  */
 app.get('/api/me', async (req, res) => {
   const tgId = extractTgId(req);
@@ -464,10 +468,10 @@ app.get('/api/me', async (req, res) => {
       }
     }
 
-    // Lazy daily earnings
+    // Lazy daily credits
     await creditDueRoi(user);
 
-    // Compute ACTIVE plans and lockedQP from plans (authoritative)
+    // Build response plans and authoritative lockedQP
     const rawPlans = Array.isArray(user.activePlans) ? user.activePlans : [];
     const activePlans = rawPlans.filter(p => p.status !== 'completed');
 
@@ -485,7 +489,6 @@ app.get('/api/me', async (req, res) => {
 
     const lockedFromPlans = plansOut.reduce((s,p)=> s + Number(p.qp || 0), 0);
 
-    // Auto-heal DB if mismatched
     if ((Number(user.balances?.lockedQP || 0)) !== lockedFromPlans) {
       user.balances = user.balances || {};
       user.balances.lockedQP = lockedFromPlans;
@@ -499,7 +502,7 @@ app.get('/api/me', async (req, res) => {
       botUsername: BOT_USERNAME,
       balances: {
         ...(user.balances || {}),
-        lockedQP: lockedFromPlans // authoritative value
+        lockedQP: lockedFromPlans
       },
       activePlans: plansOut,
       debugSource: 'db'
@@ -551,7 +554,7 @@ async function computeReferralSummaryByLevels_TgString(tgId) {
         if (q > 0) qpSum += q;
       }
     }
-    const earnings = qpSum * 0.01; // 1% per level
+    const earnings = qpSum * 0.01;
 
     out.push({ level: lvl, count, earnings });
     frontier = kids.map(x => x.tgId);
@@ -574,11 +577,13 @@ app.get('/api/referrals', async (req, res) => {
   }
 });
 
-// ---------- Simulated deposit (dev-only) ----------
-const DEV_ENABLED = process.env.NODE_ENV !== 'production';
+// ---------- Simulated deposit (now allowed in prod with admin key) ----------
 app.post('/api/debug/simulate-deposit', async (req, res) => {
   try {
-    if (!DEV_ENABLED) return res.status(403).json({ ok: false, error: 'disabled_in_prod' });
+    const devEnabled = NODE_ENV !== 'production';
+    if (!devEnabled && !isAdmin(req)) {
+      return res.status(403).json({ ok: false, error: 'disabled_in_prod' });
+    }
     if (!DB_READY)  return res.status(503).json({ ok: false, error: 'no_db' });
 
     const { tgId, amount, txid } = req.body || {};
@@ -641,7 +646,7 @@ const MAX_KEEP = 120;
 const SHOW_N = 10;
 
 function randInt(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
-function randChoice(arr){ return arr[randInt(0, arr.length-1)]; }
+function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function round2(n){ return Math.round(n*100)/100; }
 
 function genSimTrade(ts = Date.now()){
@@ -672,11 +677,6 @@ app.get('/api/trades', (_req,res)=>{
 });
 
 // ---------- Debug reconcile ----------
-/**
- * GET /api/debug/reconcile-user?tgId=XXXX
- * - Recomputes lockedQP from activePlans and saves it
- * - Returns the diff
- */
 app.get('/api/debug/reconcile-user', async (req, res) => {
   try{
     if (!DB_READY) return res.status(503).json({ ok:false, error:'no_db' });
